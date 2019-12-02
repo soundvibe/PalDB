@@ -61,14 +61,7 @@ public final class StoreImpl {
     }
     try {
       log.info("Initialize writer from file {}", file.getName());
-      File parent = file.getParentFile();
-      if (parent != null && !parent.exists()) {
-        if (parent.mkdirs()) {
-          log.info("Creating directories for path {}", file.getName());
-        } else {
-          throw new IOException(String.format("Couldn't create directory %s", parent));
-        }
-      }
+      Files.createDirectories(file.isDirectory() ? file.toPath() : file.toPath().toAbsolutePath().getParent());
       return new WriterImpl<>(config, file);
     } catch (IOException ex) {
       throw new UncheckedIOException(ex);
@@ -89,7 +82,7 @@ public final class StoreImpl {
     }
     log.info("Initialize RW from file {}", file.getName());
     try {
-        Files.createDirectories(file.isDirectory() ? file.toPath() : file.toPath().getParent());
+        Files.createDirectories(file.isDirectory() ? file.toPath() : file.toPath().toAbsolutePath().getParent());
         return new StoreRWImpl<>(config, file);
     } catch (IOException e) {
         throw new UncheckedIOException(e);
