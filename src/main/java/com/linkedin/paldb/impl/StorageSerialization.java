@@ -118,8 +118,14 @@ final class StorageSerialization<K,V> {
 
   // SERIALIZATION
 
-  private static final int NULL_ID = -1;
+  public static class RemovedValue {
+
+    public static final RemovedValue INSTANCE = new RemovedValue();
+
+  }
+
   private static final int NULL = 0;
+  public static final int REMOVED_ID = 1;
   private static final int BOOLEAN_TRUE = 2;
   private static final int BOOLEAN_FALSE = 3;
   private static final int INTEGER_MINUS_1 = 4;
@@ -217,6 +223,8 @@ final class StorageSerialization<K,V> {
 
     if (obj == null) {
       out.write(NULL);
+    } else if (obj == RemovedValue.INSTANCE) {
+      out.write(REMOVED_ID);
     } else if (serializer != null) {
         out.write(compress ? CUSTOM_C : CUSTOM);
         var bytes = serializer.write((T) obj);
@@ -694,7 +702,7 @@ final class StorageSerialization<K,V> {
     DataInputOutput bs = new DataInputOutput(buf);
     Object ret = deserialize(bs, serializer);
     if (bs.available() != 0) {
-      throw new RuntimeException("bytes left: " + bs.available());
+      throw new IOException("bytes left: " + bs.available());
     }
 
     return (T) ret;
@@ -730,6 +738,9 @@ final class StorageSerialization<K,V> {
         ret = serializer.read(deserializeByteCompressedArray(is));
         break;
       case NULL:
+        break;
+      case REMOVED_ID:
+        ret = RemovedValue.INSTANCE;
         break;
       case BOOLEAN_TRUE:
         ret = Boolean.TRUE;
@@ -980,9 +991,7 @@ final class StorageSerialization<K,V> {
       case ARRAY_OBJECT:
         ret = deserializeArrayObject(is, serializer);
         break;
-      case -1:
-        throw new EOFException();
-
+      default: throw new EOFException();
     }
     return (T) ret;
   }
@@ -1101,7 +1110,7 @@ final class StorageSerialization<K,V> {
     return ret;
   }
 
-  private static final byte[] EMPTY_BYTES = new byte[0];
+  public static final byte[] EMPTY_BYTES = new byte[0];
 
   private static byte[] deserializeByteArray(DataInput is) throws IOException {
     int size = LongPacker.unpackInt(is);

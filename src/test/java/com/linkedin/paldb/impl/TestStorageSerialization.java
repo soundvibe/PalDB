@@ -25,7 +25,7 @@ import java.math.*;
 import java.nio.*;
 
 import static org.junit.jupiter.api.Assertions.*;
-
+@DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class TestStorageSerialization {
 
   private StorageSerialization<Integer,Integer> serialization;
@@ -591,6 +591,38 @@ class TestStorageSerialization {
     var res = serialization.deserializeKey(serialization.serializeKey(d));
     assertEquals(res.getClass(), long[][].class);
     assertArrayEquals(d, res);
+  }
+
+  @Test
+  void should_throw_when_deserializing_and_serializer_is_not_registered() throws IOException {
+    var config = PalDBConfigBuilder.<String,Point>create()
+            .withValueSerializer(new TestStoreReader.PointSerializer())
+            .build();
+    var serialization = new StorageSerialization<>(config);
+    var bytes = serialization.serializeValue(new Point(5, 4));
+    var deserialization = new StorageSerialization<>(new Configuration<String,Point>());
+    assertThrows(MissingSerializer.class, () -> deserialization.deserializeValue(bytes));
+  }
+
+  @Test
+  void should_throw_when_deserializing_and_serializer_is_not_registered_compressed() throws IOException {
+    var config = PalDBConfigBuilder.<String,Point>create()
+            .withEnableCompression(true)
+            .withValueSerializer(new TestStoreReader.PointSerializer())
+            .build();
+    var serialization = new StorageSerialization<>(config);
+    var bytes = serialization.serializeValue(new Point(5, 4));
+    var deserialization = new StorageSerialization<>(PalDBConfigBuilder.<String,Point>create()
+            .withEnableCompression(true)
+            .build());
+    assertThrows(MissingSerializer.class, () -> deserialization.deserializeValue(bytes));
+  }
+
+  @Test
+  void should_serialize_removed_instance() throws IOException {
+    var serialization = new StorageSerialization<>(new Configuration<>());
+    var bytes = serialization.serializeValue(StorageSerialization.RemovedValue.INSTANCE);
+    assertSame(StorageSerialization.RemovedValue.INSTANCE, serialization.deserializeValue(bytes));
   }
 
   // UTILITY
