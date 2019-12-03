@@ -702,7 +702,7 @@ final class StorageSerialization<K,V> {
     DataInputOutput bs = new DataInputOutput(buf);
     Object ret = deserialize(bs, serializer);
     if (bs.available() != 0) {
-      throw new RuntimeException("bytes left: " + bs.available());
+      throw new IOException("bytes left: " + bs.available());
     }
 
     return (T) ret;
@@ -991,9 +991,7 @@ final class StorageSerialization<K,V> {
       case ARRAY_OBJECT:
         ret = deserializeArrayObject(is, serializer);
         break;
-      case -1:
-        throw new EOFException();
-
+      default: throw new EOFException();
     }
     return (T) ret;
   }
