@@ -1,5 +1,9 @@
 Change Log
 ==========
+Version 2.1.1
+--------------------------
+- Added `remove(key)` to `StoreWriter<K,V>` and `StoreInitializer<K,V>`
+
 Version 2.1.0
 --------------------------
 - New StoreRW interface for reading and writing
