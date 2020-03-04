@@ -631,6 +631,22 @@ class TestStore {
     }
   }
 
+  @Test
+  void should_write_huge_bloom_filter() {
+    var config = PalDBConfigBuilder.<String,byte[]>create()
+            .withEnableBloomFilter(true).build();
+    try (StoreWriter<String,byte[]> writer = PalDB.createWriter(storeFile, config)) {
+      for (int i = 0; i < 10_000_000; i++) {
+        writer.put(String.valueOf(i), EMPTY_VALUE);
+      }
+    }
+
+    try (StoreReader<String,byte[]> reader = PalDB.createReader(storeFile, config)) {
+      assertNull(reader.get("foo"));
+      assertArrayEquals(EMPTY_VALUE, reader.get("100"));
+    }
+  }
+
   private static final byte[] EMPTY_VALUE = new byte[0];
 
   @Test
