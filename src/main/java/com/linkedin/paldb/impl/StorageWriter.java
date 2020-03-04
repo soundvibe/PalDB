@@ -187,8 +187,7 @@ public class StorageWriter {
       //Write metadata file
       File metadataFile = new File(tempFolder, "metadata.dat");
       metadataFile.deleteOnExit();
-
-      try (var metadataOutputStream = new RandomAccessFile(metadataFile, "rw")) {
+      try (var metadataOutputStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(metadataFile)))) {
         writeMetadata(metadataOutputStream, bloomFilter);
       }
 
@@ -213,7 +212,7 @@ public class StorageWriter {
     }
   }
 
-  private void writeMetadata(RandomAccessFile dataOutputStream, BloomFilter bloomFilter) throws IOException {
+  private void writeMetadata(DataOutputStream dataOutputStream, BloomFilter bloomFilter) throws IOException {
     //Write format version
     dataOutputStream.writeUTF(FormatVersion.getLatestVersion().name());
 
@@ -227,19 +226,24 @@ public class StorageWriter {
     //Write size (number of keys)
     dataOutputStream.writeLong(keyCount);
 
-    //write bloom filter bit size
-    dataOutputStream.writeInt(bloomFilter != null ? bloomFilter.bitSize() : 0);
-    //write bloom filter long array size
-    dataOutputStream.writeInt(bloomFilter != null ? bloomFilter.bits().length : 0);
-    //write bloom filter hash functions
-    dataOutputStream.writeInt(bloomFilter != null ? bloomFilter.hashFunctions() : 0);
-    //write bloom filter bits
     if (bloomFilter != null) {
+      //write bloom filter bit size
+      dataOutputStream.writeInt(bloomFilter.bitSize());
+      //write bloom filter bits array size
+      dataOutputStream.writeInt(bloomFilter.bits().length);
+      //write bloom filter hash functions
+      dataOutputStream.writeInt(bloomFilter.hashFunctions());
+      //write bloom filter bits
       for (final long bit : bloomFilter.bits()) {
         dataOutputStream.writeLong(bit);
       }
+    } else {
+      dataOutputStream.writeInt(0);
+      //write bloom filter long array size
+      dataOutputStream.writeInt(0);
+      //write bloom filter hash functions
+      dataOutputStream.writeInt(0);
     }
-
     //Write the number of different key length
     dataOutputStream.writeInt(keyLengthCount);
 
@@ -280,7 +284,7 @@ public class StorageWriter {
     }
 
     //Write the position of the index and the data
-    long indexOffset = dataOutputStream.getFilePointer() + (Long.SIZE / Byte.SIZE) + (Long.SIZE / Byte.SIZE);
+    long indexOffset = (long) dataOutputStream.size() + (Long.SIZE / Byte.SIZE) + (Long.SIZE / Byte.SIZE);
     dataOutputStream.writeLong(indexOffset);
     //data offset
     dataOutputStream.writeLong(indexOffset + indexesLength);
