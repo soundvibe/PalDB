@@ -6,6 +6,7 @@ dist: trusty
 matrix:
   include:
     - jdk: openjdk13
+    - jdk: openjdk14
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)

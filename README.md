@@ -97,12 +97,12 @@ PalDB is available on Maven Central, hence just add the following dependency:
 <dependency>
     <groupId>net.soundvibe</groupId>
     <artifactId>paldb</artifactId>
-    <version>2.1.2</version>
+    <version>2.1.3</version>
 </dependency>
 ```
 Scala SBT
 ```
-libraryDependencies += "net.soundvibe" % "paldb" % "2.1.2"
+libraryDependencies += "net.soundvibe" % "paldb" % "2.1.3"
 ```
 
 

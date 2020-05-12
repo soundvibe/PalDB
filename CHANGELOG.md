@@ -1,5 +1,9 @@
 Change Log
 ==========
+Version 2.1.3
+--------------------------
+- Fixed possible deadlock when trying to update store while iterating
+
 Version 2.1.1
 --------------------------
 - Added `remove(key)` to `StoreWriter<K,V>` and `StoreInitializer<K,V>`

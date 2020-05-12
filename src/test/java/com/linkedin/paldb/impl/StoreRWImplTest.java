@@ -8,11 +8,11 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.*;
 import java.nio.file.*;
 import java.time.Duration;
-import java.util.*;
+import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.toList;
 import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
@@ -490,6 +490,11 @@ class StoreRWImplTest {
                             assertEquals("any value 2", store.get(5));
                             assertEquals(name, store.get(id));
                         }
+
+                        try (var stream = store.stream()) {
+                            stream.forEach(e -> assertEquals(e.getValue(), store.get(e.getKey())));
+                        }
+
                     } catch (Throwable error){
                         error.printStackTrace();
                         success.set(false);
@@ -520,8 +525,9 @@ class StoreRWImplTest {
             sut.put("any", "updated value");
 
             try (var stream = sut.stream()) {
-                var any = stream.filter(e -> e.getKey().equals("any"))
-                        .collect(Collectors.toList());
+                var any = stream
+                        .filter(e -> e.getKey().equals("any"))
+                        .collect(toList());
 
                 assertEquals(1, any.size());
                 assertEquals("any", any.get(0).getKey());
@@ -530,11 +536,67 @@ class StoreRWImplTest {
 
             sut.remove("other");
             try (var stream = sut.stream()) {
-                var any = stream.filter(e -> e.getKey().equals("other"))
-                        .collect(Collectors.toList());
+                var any = stream
+                        .filter(e -> e.getKey().equals("other"))
+                        .collect(toList());
 
                 assertEquals(0, any.size());
             }
+        }
+    }
+
+    @Test
+    void should_be_able_to_update_store_while_iterating(@TempDir Path tempDir) throws InterruptedException {
+        var file = tempDir.resolve("testIterate.paldb");
+
+        try (var sut = new StoreRWImpl<>(PalDBConfigBuilder.<String,String>create()
+                .withEnableWriteAutoFlush(true)
+                .build(),
+                file.toFile())) {
+
+            try (var init = sut.init()) {
+                init.put("any", "value");
+                init.put("other", "value2");
+            }
+
+            sut.put("any", "updated value");
+
+            try (var stream = sut.stream()) {
+                var any = stream
+                        .peek(e -> System.out.println("Iterating: " + e))
+                        .filter(e -> e.getKey().equals("any"))
+                        .peek(e -> {
+                            var future = CompletableFuture.runAsync(() -> {
+                                System.out.println("Starting update from separate thread");
+                                sut.put("new2", "value2");
+                                System.out.println("Removing from separate thread");
+                                sut.remove("other");
+                                System.out.println("Finished updating from separate thread");
+                            });
+                            System.out.println("Starting update");
+                            sut.put("new", "value");
+                            System.out.println("Removing");
+                            sut.remove("other");
+                            System.out.println("Finished updating");
+                            future.join();
+                        })
+                        .collect(toList());
+
+                assertEquals(1, any.size());
+                assertEquals("any", any.get(0).getKey());
+                assertEquals("updated value", any.get(0).getValue());
+            }
+
+            sut.remove("other");
+            try (var stream = sut.stream()) {
+                var any = stream
+                        .filter(e -> e.getKey().equals("other"))
+                        .collect(toList());
+
+                assertEquals(0, any.size());
+            }
+
+            assertEquals("value2", sut.get("new2"));
         }
     }
 

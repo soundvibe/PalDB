@@ -239,7 +239,7 @@ public class StoreRWImpl<K,V> implements StoreRW<K,V> {
                 log.info("Compacting {}, size: {}", file, file.length());
                 var tempFile = FileUtils.createTempFile("tmp_", EXT_PALDB);
                 try (var writer = new WriterImpl<>(config, tempFile)) {
-                    Iterable<Map.Entry<K,V>> iter = () -> new RWEntryIterator<>(reader.get(), entries, null);
+                    Iterable<Map.Entry<K,V>> iter = () -> new RWEntryIterator<>(reader.get(), entries, rwLock);
                     for (var keyValue : iter) {
                         writer.put(keyValue.getKey(), keyValue.getValue());
                     }
@@ -303,15 +303,13 @@ public class StoreRWImpl<K,V> implements StoreRW<K,V> {
     @Override
     public Stream<Map.Entry<K, V>> stream() {
         var iterator = iterator();
-        return StreamSupport.stream(iterator.spliterator(), false)
-                .onClose(iterator::close);
+        return StreamSupport.stream(iterator.spliterator(), false);
     }
 
     @Override
     public Stream<K> streamKeys() {
         var iterator = keys();
-        return StreamSupport.stream(iterator.spliterator(), false)
-                .onClose(iterator::close);
+        return StreamSupport.stream(iterator.spliterator(), false);
     }
 
     private void invokeOnCompacted(Map.Entry<K,V> lastEntry, File storeFile) {
@@ -362,7 +360,7 @@ public class StoreRWImpl<K,V> implements StoreRW<K,V> {
 
         @Override
         public Iterator<Map.Entry<K, V>> iterator() {
-            return this;
+            return new RWEntryIterator<>(reader, buffer, rwLock);
         }
     }
 
@@ -381,19 +379,21 @@ public class StoreRWImpl<K,V> implements StoreRW<K,V> {
 
         @Override
         public Iterator<K> iterator() {
-            return this;
+            return new RWKeyIterator<>(reader, buffer, rwLock);
         }
     }
 
-    private abstract static class RWIterator<K,V> implements AutoCloseable {
-        private final Map<K, V> buffer;
-        private final ReentrantReadWriteLock rwLock;
+    private abstract static class RWIterator<K,V> {
+        final ReaderImpl<K, V> reader;
+        final Map<K, V> buffer;
+        final ReentrantReadWriteLock rwLock;
         private Iterator<Map.Entry<K,V>> iterator;
         Boolean checkedHasNext;
         private boolean startTheSecond;
         Map.Entry<K,V> nextValue;
 
         RWIterator(ReaderImpl<K, V> reader, Map<K, V> buffer, ReentrantReadWriteLock rwLock) {
+            this.reader = reader;
             this.buffer = buffer;
             this.rwLock = rwLock;
             this.iterator = reader.iterator();
@@ -405,16 +405,14 @@ public class StoreRWImpl<K,V> implements StoreRW<K,V> {
             return checkedHasNext;
         }
 
-        @Override
-        public void close() {
-            if (startTheSecond && rwLock != null) {
-                rwLock.readLock().unlock();
-            }
-        }
-
         void doNext() {
             if (iterator.hasNext()) {
-                nextValue = iterator.next();
+                rwLock.readLock().lock();
+                try {
+                    nextValue = iterator.next();
+                } finally {
+                    rwLock.readLock().unlock();
+                }
                 if (!startTheSecond) {
                     if (buffer.containsKey(nextValue.getKey())) {
                         doNext();
@@ -431,9 +429,6 @@ public class StoreRWImpl<K,V> implements StoreRW<K,V> {
                 checkedHasNext = false;
             else {
                 startTheSecond = true;
-                if (rwLock != null) {
-                    rwLock.readLock().lock();
-                }
                 iterator = buffer.entrySet().iterator();
                 doNext();
             }
