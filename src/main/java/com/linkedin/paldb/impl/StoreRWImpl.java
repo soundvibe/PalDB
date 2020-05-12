@@ -303,15 +303,13 @@ public class StoreRWImpl<K,V> implements StoreRW<K,V> {
     @Override
     public Stream<Map.Entry<K, V>> stream() {
         var iterator = iterator();
-        return StreamSupport.stream(iterator.spliterator(), false)
-                .onClose(iterator::close);
+        return StreamSupport.stream(iterator.spliterator(), false);
     }
 
     @Override
     public Stream<K> streamKeys() {
         var iterator = keys();
-        return StreamSupport.stream(iterator.spliterator(), false)
-                .onClose(iterator::close);
+        return StreamSupport.stream(iterator.spliterator(), false);
     }
 
     private void invokeOnCompacted(Map.Entry<K,V> lastEntry, File storeFile) {
@@ -385,7 +383,7 @@ public class StoreRWImpl<K,V> implements StoreRW<K,V> {
         }
     }
 
-    private abstract static class RWIterator<K,V> implements AutoCloseable {
+    private abstract static class RWIterator<K,V> {
         final ReaderImpl<K, V> reader;
         final Map<K, V> buffer;
         final ReentrantReadWriteLock rwLock;
@@ -406,9 +404,6 @@ public class StoreRWImpl<K,V> implements StoreRW<K,V> {
                 doNext();
             return checkedHasNext;
         }
-
-        @Override
-        public void close() {}
 
         void doNext() {
             if (iterator.hasNext()) {
